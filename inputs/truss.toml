@@ -1,0 +1,51 @@
+# Truss example 1
+# Units: kgf and cm
+# Global axes: x to the right, y up
+
+structure = "2d_truss"
+
+[materials]
+steel = { E = 1.8e6, v = 0.3 }    # E [kgf/cm2], v [-]
+
+[geometries]
+geo_1 = { A = 50.0 }              # A [cm2]
+
+[mesh]
+# Node i is the i-th line. Coordinates: x, y
+nodes = [
+    [0.0, 0.0],   # node 1
+    [2.0, 0.0],   # node 2
+    [4.0, 0.0],   # node 3
+    [1.0, 2.0],   # node 4
+    [3.0, 2.0],   # node 5
+]
+
+# Element k is the k-th line. Node i, node j, material, geometry
+elements = [
+    [1, 2, "steel", "geo_1"],   # element 1
+    [2, 3, "steel", "geo_1"],   # element 2
+    [1, 4, "steel", "geo_1"],   # element 3
+    [4, 2, "steel", "geo_1"],   # element 4
+    [2, 5, "steel", "geo_1"],   # element 5
+    [5, 3, "steel", "geo_1"],   # element 6
+    [4, 5, "steel", "geo_1"],   # element 7
+]
+
+[boundary]
+# node, ux, uy  (prescribed displacement in cm)
+#   0.0 = locked | nan = free | any other value = settlement
+# Examples: roller on y only -> [3, nan, 0.0] ; settlement of 0.5 cm down -> [3, 0.0, -0.5]
+supports = [
+    [1, 0.0, 0.0],   # node 1: locked in x and y
+    [3, 0.0, 0.0],   # node 3: locked in x and y
+]
+
+# Nodal loads in global axes: node, Fx, Fy [kgf]
+loads = [
+    [4, 10e3, 0.0],
+]
+
+# Nodal loads in global axes: node, Fx, Fy [kgf]
+loads = [
+    [4, 10e3, 0.0],
+]
