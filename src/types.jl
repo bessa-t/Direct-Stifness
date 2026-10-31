@@ -1,8 +1,23 @@
 using LinearAlgebra
 
-abstract type element end
+abstract type AbstractElement end
+abstract type AbstractMaterial end
+abstract type AbstractSection end
+## Materials
 
-function stiffness_global(e::element)
+struct Material <: AbstractMaterial
+    E::Float64
+    v::Float64
+end
+
+## Sections
+struct TrussSection <: AbstractSection
+    A::Float64
+end
+
+## Elements
+
+function stiffness_global(e::AbstractElement)
     KL = stiffness_local(e)
     T = rotation_matrix(e)
     return  T' * KL * T 
@@ -21,7 +36,7 @@ struct GeomData3D
     L::Float64  
 end
 
-function lengths_directions(mesh::Dict)
+function lengths_directions(mesh::AbstractDict)
     elements = mesh["elements"]
     nodes = mesh["nodes"]
     n_elem = length(elements)
