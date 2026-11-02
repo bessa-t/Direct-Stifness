@@ -41,7 +41,7 @@ groups = [
 # node, ux, uy  (prescribed displacement in cm)
 #   0.0 = locked | nan = free | any other value = settlement
 # Examples: roller on y only -> [3, nan, 0.0] ; settlement of 0.5 cm down -> [3, 0.0, -0.5]
-supports = [
+boundary = [
     [1, 0.0, 0.0],   # node 1: locked in x and y
     [3, 0.0, 0.0],   # node 3: locked in x and y
 ]

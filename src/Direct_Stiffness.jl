@@ -8,4 +8,5 @@ include("types/element.jl")
 include("elements/truss.jl")
 
 include("assemble.jl")
+include("boundary.jl")
 end
