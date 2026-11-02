@@ -34,11 +34,9 @@ elements = [
     [4, 5],   # element 7
 ]
 
-[[groups]]
-elements = [4, 5]
-material = "steel"
-section = "sec_1"
-
+groups = [
+    { elements = [4, 5], material = "steel", section = "sec_1" },
+]
 
 # node, ux, uy  (prescribed displacement in cm)
 #   0.0 = locked | nan = free | any other value = settlement
