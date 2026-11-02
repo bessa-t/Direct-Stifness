@@ -47,6 +47,7 @@ boundary = [
 ]
 
 # Nodal loads in global axes: node, Fx, Fy [kgf]
-loads = [
+[loads]
+nodal_loads = [
     [4, 10e3, 0.0],
 ]

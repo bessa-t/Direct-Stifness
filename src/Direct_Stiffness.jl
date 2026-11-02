@@ -9,4 +9,5 @@ include("elements/truss.jl")
 
 include("assemble.jl")
 include("boundary.jl")
+include("types/external_forces.jl")
 end
