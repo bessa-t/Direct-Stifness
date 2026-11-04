@@ -5,22 +5,24 @@ Alvo atual: **treliça 2D**. A arquitetura já prevê treliça 3D e pórtico 2D/
 
 - Unidades dos exemplos: kgf e cm. Eixos globais: x para a direita, y para cima.
 - Julia 1.13. Código e identificadores em inglês; discussão com o autor em português.
-- Rodar: `julia src/Direct_Stiffness.jl [inputs/arquivo.toml]` (padrão: `inputs/truss.toml`); gera `outputs/<nome do input>.txt`.
+- Rodar: `julia src/Direct_Stiffness.jl [inputs/arquivo.toml]` (padrão: `inputs/2d_truss.toml`); gera `outputs/<nome do input>.txt`.
   `julia src/test.jl` imprime o mesmo relatório na tela. Funciona de qualquer pasta (usa `@__DIR__`).
 
 ## Estado atual
 
 | Etapa | Arquivo | Estado |
 |---|---|---|
-| Leitura do TOML | `src/assemble.jl` (`read_model`) | pronto |
-| Montagem do modelo (`Structure`) | `src/assemble.jl` (`build_structure`) | pronto |
+| Leitura do TOML | `src/input.jl` (`load_model`) | pronto |
+| Montagem do modelo (`Structure`) | `src/input.jl` (`build_structure`) | pronto |
 | Matriz de rigidez global (esparsa) | `src/assemble.jl` | pronto |
 | Vetor de deslocamentos prescritos `u_pre` | `src/boundary.jl` | pronto |
-| Vetor de forças `F` | `src/types/external_forces.jl` | pronto para cargas nodais (`nodal_loads`) |
+| Vetor de forças `F` | `src/types/external_forces.jl` | pronto para `nodal_loads` e `constant_loads` (barras horizontais de viga/pórtico 2D) |
+| Viga de Bernoulli (`2d_beam`) | `src/elements/bernoulli_beam.jl` | pronto; `inputs/2d_beam.toml` conferido com solução independente (método das forças) |
 | Solver (partição) | `src/solver.jl` (`solve_system`) | pronto |
 | Relatório em texto | `src/report.jl` + `run_analysis` | pronto (sem esforços internos) |
-| Esforços internos | `src/internal_forces.jl` | vazio |
-| Pórtico (`Frame2D/3D`), rótulas, cargas de barra | — | não iniciado |
+| Esforços internos | `src/internal_forces.jl` | treliça, viga e pórtico 2D implementados; viga e pórtico ainda sem conferência dos valores |
+| Pórtico 2D (`Frame_2D`) | `src/elements/frame.jl` | ligado ao módulo, valores não conferidos |
+| Pórtico 3D, rótulas, cargas trapezoidais | — | não iniciado (o laço trapezoidal está comentado em `external_forces.jl`) |
 
 Único caso verificado: a treliça de `inputs/truss.toml`. O termo `K[1,1] = 5.625e7` foi conferido à mão
 (barra horizontal `4.5e7` + barra a 60° `4.5e7·cos²60° = 1.125e7`). A simetria e o equilíbrio de
@@ -29,14 +31,14 @@ corpo rígido da K inteira **ainda não foram verificados**, e não há testes a
 ## Fluxo de dados
 
 ```
-TOML ──read_model──▶ data
-data ──build_structure──▶ Structure{Element{G,S}}
+TOML ──load_model──▶ (; s, u_pre, F)     # único ponto que conhece as chaves do TOML
+  ├─ build_structure ──▶ s::Structure{Element{G,S}}
+  ├─ parse_nodal_rows + build_displacement_vector ──▶ u_pre   (NaN = GDL livre)
+  └─ parse_nodal_rows + build_F_vector ──▶ F
 Structure ──build_global_stiffness_matrix──▶ K (esparsa)
-mesh["boundary"] ──build_displacement_vector──▶ u_pre   (NaN = GDL livre)
-data["loads"]    ──build_F_vector──▶ F
 (K, F, u_pre) ──solve_system──▶ u, R
 (s, F, u_pre, u, R) ──write_report──▶ outputs/<input>.txt
-(Structure, u) ──internal forces──▶ N por barra  [a fazer]
+(s, u, element_q) ──element_internal_forces──▶ esforços por barra (entram no relatório)
 ```
 
 `run_analysis(input)` em `Direct_Stiffness.jl` executa tudo e grava o relatório.
@@ -47,12 +49,15 @@ data["loads"]    ──build_F_vector──▶ F
 src/
 ├── Direct_Stiffness.jl          # módulo DirectStiffness; ÚNICO lugar com `include`
 ├── types/
-│   ├── material_section.jl      # Material, AbstractSection, TrussSection, Frame_2D, Frame_3D, element_material
+│   ├── material_section.jl      # Material, AbstractSection, TrussSection, Beam_Section, Frame_2D_Section, Frame_3D
 │   ├── geometry.jl              # AbstractGeom, GeomData2D/3D, element_geometry
-│   ├── element.jl               # AbstractElement, Element{G,S}, ElementStiffness (não usado)
+│   ├── element.jl               # AbstractElement, Element{G,S}, element_dofs, ElementStiffness (não usado)
 │   └── external_forces.jl       # build_F_vector
 ├── elements/truss.jl            # Truss2D/Truss3D (aliases) e seus métodos
-├── assemble.jl                  # Structure, build_structure, K global, node_dofs
+├── elements/bernoulli_beam.jl   # Beam (alias) e element_stiffness; só barras horizontais
+├── elements/frame.jl            # Frame_2D (alias), transformation_matrix e element_stiffness
+├── assemble.jl                  # Structure, K global, node_dofs
+├── input.jl                     # load_model, build_structure, parse_*: único arquivo que conhece o TOML
 ├── boundary.jl                  # build_displacement_vector
 ├── solver.jl                    # solve_system (partição)
 ├── report.jl                    # write_report (texto plano)
@@ -65,10 +70,10 @@ dos campos). Funções podem ser definidas em qualquer ordem. Arquivos internos 
 ## Formato do TOML (`inputs/truss.toml`)
 
 ```toml
-structure = "2d_truss"          # 2d_truss | 3d_truss | 2d_frame | 3d_frame
+structure = "2d_truss"          # 2d_truss | 3d_truss | 2d_beam | 2d_frame | 3d_frame
 
 [materials]  steel = { E = ..., v = ... }
-[sections]   sec_1 = { A = ... }          # pórtico exige Iz (2D) ou Ix,Iy,Iz,Jx,Jy,Jz (3D)
+[sections]   sec_1 = { A = ... }          # viga exige só Iz; pórtico exige A,Iz (2D) ou A,Ix,Iy,Iz,Jx,Jy,Jz (3D)
 
 [mesh]
 default_material = "steel"
@@ -80,6 +85,7 @@ boundary = [[nó, ux, uy], ...]            # 0.0 travado | nan livre | outro val
 
 [loads]                                   # NA RAIZ, não dentro de mesh
 nodal_loads = [[nó, Fx, Fy], ...]         # eixos globais
+constant_loads = [[elemento, q], ...]     # q uniforme no y local; só 2d_beam/2d_frame, barra horizontal
 ```
 
 Armadilha de TOML: tudo que vem depois de um cabeçalho `[tabela]` ou `[[tabela]]` pertence a ele.
@@ -107,8 +113,11 @@ Por isso `boundary` e `groups` ficam dentro de `mesh` (lidos como `mesh["boundar
   com o pórtico.
 - **Os nós da barra ficam em `GeomData`** (`geometry.nodes::Tuple{Int,Int}`), junto de `c, s, L` (2D) ou
   `l, m, n, L` (3D). Acesso uniforme: `e.geometry.nodes`.
-- **`Structure{E<:Element}`** guarda `kind`, `dofs_per_node`, `nnodes`, `elements`. Cargas e apoios **não**
-  ficam nele: servem só para montar `F` e `u_pre`. `kind` hoje só é usado em `dof_name`.
+- **`Structure{E<:Element}`** guarda `kind`, `dofs_per_node`, `nodes` (coordenadas), `elements`; a contagem é
+  `nnodes(s)`. Cargas e apoios **não** ficam nele: servem só para montar `F` e `u_pre`.
+  `kind` hoje é usado em `dof_name` e no relatório.
+- **As coordenadas ficam em `Structure`, não em cada elemento:** um nó compartilhado por várias barras seria
+  duplicado, e apoios e cargas pertencem ao nó. O elemento guarda só os números dos nós e `c, s, L`.
 
 ### Decidir por dicionário, não por `if`
 `SECTION_PARSERS`, `DOFS_PER_NODE` e `DOF_NAMES` são `const Dict` indexados pelo `structure` do TOML.
@@ -118,14 +127,14 @@ erro listando as opções válidas. Tipos-marca com despacho só compensariam se
 aparecesse em muitos arquivos.
 
 ### Geometria
-`element_geometry(elem, nodes)` calcula por vetor: `d = nodes[j] - nodes[i]`, `L = norm(d)`, cossenos `d./L`.
+`element_geometry(i, j, nodes)` calcula por vetor: `d = nodes[j] - nodes[i]`, `L = norm(d)`, cossenos `d./L`.
 A dimensão sai de `length(d)`. Erro explícito para barra de comprimento zero.
 Conhecido: o retorno é `Union{GeomData2D, GeomData3D}` (instabilidade de tipo). Para malhas grandes, descobrir a
 dimensão uma vez e passar `Val(dim)` (barreira de função).
 
 ### Numeração dos GDL
 **Por nó**: `u1x, u1y, u2x, u2y, ...`. O nó `n` ocupa `node_dofs(n, d) = (n-1)*d+1 : n*d`, na ordem
-`(ux, uy[, uz][, rotações])`. `d = DOFS_PER_NODE[kind]`: 2 (treliça 2D), 3 (treliça 3D e pórtico 2D), 6 (pórtico 3D).
+`(ux, uy[, uz][, rotações])`. `d = DOFS_PER_NODE[kind]`: 2 (treliça 2D), 2 (viga: `uy, θ`), 3 (treliça 3D e pórtico 2D), 6 (pórtico 3D).
 Montagem, cargas e apoios **devem** usar `node_dofs`; qualquer divergência produz resultado errado sem aviso.
 `dof_name(s, g)` converte GDL global em rótulo (`"u3x"`).
 Numeração uniforme em todos os nós (não se numeram só os GDL com rigidez).
@@ -147,10 +156,12 @@ Termos nulos de `Ke` são armazenados (`dropzeros!` se necessário).
   Sempre derivar `fixed = findall(!isnan, u_pre)` e `free = findall(isnan, u_pre)` e indexar só por eles
   (`NaN` contamina qualquer conta que use o vetor inteiro).
 - `F`: `zeros(n)`, cargas nodais **somadas** (`.+=`); `u_pre` usa `.=`.
-- Validações: nó existente, número de valores igual a `d`, pelo menos um apoio. Chaves opcionais
+- Validações em `input.jl`: nó existente, número de valores igual a `d`, barra com 2 nós existentes, elemento de
+  grupo existente; em `build_displacement_vector`: pelo menos um apoio. Chaves opcionais
   (`loads`, `nodal_loads`) usam `get(dict, chave, [])`; dados obrigatórios usam `dict[chave]`.
-- Cargas de barra (`constant_loads`) estão previstas, mas só fazem sentido com pórtico. Quando entrarem:
-  tabela de funções por tipo (`LOAD_APPLIERS`), não hierarquia de tipos.
+- Cargas de barra (`constant_loads`): q uniforme vira forças nodais equivalentes `[qL/2, qL²/12, qL/2, -qL²/12]`.
+  `build_F_vector` devolve `(f_vec, f_dist)`; `load_model` soma em `F`. Como `K*u = f_vec + f_dist + R`, a reação
+  é `R = K*u - F`, sem tratamento separado. Só vale em barra horizontal de `2d_beam`/`2d_frame` (`parse_constant_loads` valida).
 
 ### Solver (implementado em `solver.jl`)
 **Partição** (eliminação dos GDL prescritos):
@@ -166,9 +177,12 @@ R = K * u - F          # reações: usar R[fixed]
 `Diagonal(máscara)` também dá a mesma resposta, mas resolve o sistema inteiro. Resultado idêntico; a
 diferença é custo e estilo. `SingularException` indica estrutura hipostática ou mecanismo.
 
-### Esforços internos (planejado)
-Por barra de treliça: `N = (E·A/L) · dot([-c, -s, c, s], u_e)`, positivo = tração, com
-`u_e = u[idx]` e o mesmo `idx` da montagem. Extrair `element_dofs(e, d)` para montagem e esforços compartilharem.
+### Esforços internos (`internal_forces.jl`)
+`get_internal_forces(e, u_e, q)` tem um método por elemento e devolve `NamedTuple`, com
+`u_e = u[element_dofs(e, d)]`, a mesma função usada na montagem. Treliça: `(; N)`, positivo = tração.
+Viga: `(; Vi, Vj, Mi, Mj)`. Pórtico 2D: `(; N, Vi, Vj, Mi, Mj)`, em eixos locais.
+Flexão pela integração de `EI v'''' = q`: `V = qx + c1`, `M = qx²/2 + c1 x + c2`, com `c1..c4` obtidos dos
+deslocamentos das pontas em `integration_constants`.
 
 ### Pórtico e tirantes (planejado)
 - Tirante num pórtico **não** é um tipo separado: é uma barra de pórtico com **rótulas nas duas pontas**.
@@ -183,7 +197,7 @@ Por barra de treliça: `N = (E·A/L) · dot([-c, -s, c, s], u_e)`, positivo = tr
 1. `solve_system` detecta mecanismo pelo resíduo relativo `‖Kff·uf − rhs‖ ≤ 1e-8·‖rhs‖` (o Julia nem sempre lança
    `SingularException`: no teste com só o nó 1 apoiado, o resíduo foi 0.45; na estrutura estável, 3e-16).
    Se a carga for nula, a checagem não detecta mecanismo.
-2. `src/internal_forces.jl` vazio.
+2. Esforços internos de viga e pórtico sem conferência de valores (a fazer pelo autor).
 3. Validar que a dimensão dos nós bate com `structure` (hoje `2d_truss` com nós 3D monta `Element{GeomData3D,...}` sem aviso).
 4. `Material.v` e `G(E,v)` sem uso por enquanto; `ElementStiffness` definido e não usado.
 5. Nome `ElementStiffness`/`element_stiffness` ambíguo entre local e global (revisar com o pórtico).

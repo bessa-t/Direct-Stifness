@@ -1,0 +1,48 @@
+# Beam example (trabalho_1, exercise III): clamped-clamped Euler-Bernoulli beam
+# Units: kN and m
+# Global axes: x to the right, y up. Rotation positive counterclockwise.
+# DOFs per node: uy, theta
+
+structure = "2d_beam"
+
+[materials]
+steel = { E = 180e6, v = 0.3 }    # E [kN/m2] (180 GPa), v [-]
+
+[sections]
+sec_1 = { Iz = 2.1e-6 }           # Iz [m4]
+
+[mesh]
+default_material = "steel"
+default_section = "sec_1"
+
+# Node i is the i-th line. Coordinates: x, y
+nodes = [
+    [0.0, 0.0],   # node 1
+    [2.0, 0.0],   # node 2
+    [4.0, 0.0],   # node 3
+    [7.0, 0.0],   # node 4
+]
+
+# Element k is the k-th line. Node i, node j
+elements = [
+    [1, 2],   # element 1 (2 m)
+    [2, 3],   # element 2 (2 m)
+    [3, 4],   # element 3 (3 m)
+]
+
+# node, uy, theta  (prescribed displacement in m / rad)
+#   0.0 = locked | nan = free | any other value = settlement
+boundary = [
+    [1, 0.0, 0.0],   # node 1: clamped
+    [4, 0.0, 0.0],   # node 4: clamped
+]
+
+[loads]
+# node, Fy [kN], M [kN.m]
+nodal_loads = [
+    [3, -10.0, 2.0],   # P = 10 kN down and M = 2 kN.m at node 3
+]
+# element, q in local y [kN/m]
+constant_loads = [
+    [1, -0.5],   # q = 0.5 kN/m down on element 1
+]

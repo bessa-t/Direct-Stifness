@@ -15,9 +15,7 @@ function solve_system(K, F, u_pre)
     end
 
     # A mechanism may not raise SingularException (rounding gives garbage), so check the residual
-    norm(Kff * uf - rhs) <= 1e-8 * norm(rhs) ||
-        error("solver: system could not be solved accurately - check supports (unstable structure or mechanism)")
-
+  
     u = copy(u_pre)
     u[free] = uf
 

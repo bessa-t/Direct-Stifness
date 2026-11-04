@@ -15,10 +15,8 @@ struct GeomData3D <: AbstractGeom
     L::Float64  
 end
 
-function element_geometry(elem::AbstractVector, nodes::AbstractVector)
-    i, j = Int(elem[1]), Int(elem[2])
-
-    d = Float64.(nodes[j]) .- Float64.(nodes[i])   
+function element_geometry(i::Int, j::Int, nodes::AbstractVector)
+    d = nodes[j] .- nodes[i]
     L = norm(d)
     L > 0 || error("Element between nodes $i and $j has zero length")
 

@@ -1,0 +1,45 @@
+# Frame example (trabalho_1, exercise IV): 2D portal frame
+# Units: kN and m
+# Global axes: x to the right, y up. Rotation positive counterclockwise.
+# DOFs per node: ux, uy, theta
+
+structure = "2d_frame"
+
+[materials]
+steel = { E = 180e6, v = 0.3 }    # E [kN/m2] (180 GPa), v [-]
+
+[sections]
+sec_1 = { A = 5.0e-3, Iz = 2.1e-6 }   # A [m2], Iz [m4]
+
+[mesh]
+default_material = "steel"
+default_section = "sec_1"
+
+# Node i is the i-th line. Coordinates: x, y
+nodes = [
+    [0.0, 0.0],   # node 1 (base of left column)
+    [0.0, 2.0],   # node 2 (top of left column)
+    [2.0, 2.0],   # node 3 (top of right column)
+    [2.0, 0.0],   # node 4 (base of right column)
+]
+
+# Element k is the k-th line. Node i, node j
+elements = [
+    [1, 2],   # element 1 (left column)
+    [2, 3],   # element 2 (beam)
+    [3, 4],   # element 3 (right column)
+]
+
+# node, ux, uy, theta  (prescribed displacement in m / rad)
+#   0.0 = locked | nan = free | any other value = settlement
+boundary = [
+    [1, 0.0, 0.0, 0.0],   # node 1: clamped
+    [4, 0.0, 0.0, 0.0],   # node 4: clamped
+]
+
+[loads]
+# element, q in local y [kN/m] (horizontal bars only)
+# Element 2 runs from node 2 to node 3 (local y = up), so a downward load is negative.
+constant_loads = [
+    [2, -0.5],   # q = 0.5 kN/m down on the beam
+]

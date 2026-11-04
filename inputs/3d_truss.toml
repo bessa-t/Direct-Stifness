@@ -1,0 +1,44 @@
+# Truss example 2 (trabalho_1, exercise II): 3D truss
+# Units: kN and m
+# Global axes: x, y horizontal, z up
+
+structure = "3d_truss"
+
+[materials]
+steel = { E = 180e6, v = 0.3 }    # E [kN/m2] (180 GPa), v [-]
+
+[sections]
+sec_1 = { A = 5.0e-3 }            # A [m2]
+
+[mesh]
+default_material = "steel"
+default_section = "sec_1"
+
+# Node i is the i-th line. Coordinates: x, y, z
+nodes = [
+    [0.0, 0.0, 3.0],   # node 1 (top, loaded)
+    [0.0, 0.0, 0.0],   # node 2 (base)
+    [0.0, 2.0, 0.0],   # node 3
+    [2.0, 0.0, 0.0],   # node 4
+]
+
+# Element k is the k-th line. Node i, node j
+elements = [
+    [2, 1],   # element 1 (vertical)
+    [1, 3],   # element 2
+    [1, 4],   # element 3
+]
+
+# node, ux, uy, uz  (prescribed displacement in m)
+#   0.0 = locked | nan = free | any other value = settlement
+boundary = [
+    [2, 0.0, 0.0, 0.0],   # node 2: pinned
+    [3, 0.0, 0.0, 0.0],   # node 3: pinned
+    [4, 0.0, 0.0, 0.0],   # node 4: pinned
+]
+
+# Nodal loads in global axes: node, Fx, Fy, Fz [kN]
+[loads]
+nodal_loads = [
+    [1, 0.0, 10.0, 0.0],   # P in +y at node 1
+]

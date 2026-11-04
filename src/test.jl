@@ -1,12 +1,10 @@
 include("Direct_Stiffness.jl")
 using .DirectStiffness
 
-data  = DirectStiffness.read_model(joinpath(@__DIR__, "..", "inputs", "truss.toml"))
-s     = DirectStiffness.build_structure(data)
-K     = DirectStiffness.build_global_stiffness_matrix(s)
-u_pre = DirectStiffness.build_displacement_vector(s, data["mesh"]["boundary"])
-F     = DirectStiffness.build_F_vector(s, get(data, "loads", Dict()))
+(; s, u_pre, F, element_q) = DirectStiffness.load_model(joinpath(@__DIR__, "..", "inputs", "2d_truss.toml"))
 
-u, R = DirectStiffness.solve_system(K, F, u_pre)
+K      = DirectStiffness.build_global_stiffness_matrix(s)
+u, R   = DirectStiffness.solve_system(K, F, u_pre)
+forces = DirectStiffness.element_internal_forces(s, u, element_q)
 
-DirectStiffness.write_report(stdout, s, F, u_pre, u, R)
+DirectStiffness.write_report(stdout, s, F, u_pre, u, R, forces)

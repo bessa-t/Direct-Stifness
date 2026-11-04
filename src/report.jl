@@ -3,11 +3,18 @@ direction_header(::GeomData3D) = "l, m, n"
 direction_str(g::GeomData2D) = @sprintf("%11.3f", rad2deg(atan(g.s, g.c)))
 direction_str(g::GeomData3D) = @sprintf("%.3f, %.3f, %.3f", g.l, g.m, g.n)
 
+# Section property shown in the elements table: the area, except for beams (no A)
+section_header(::AbstractSection) = "A"
+section_header(::Beam_Section)    = "Iz"
+section_str(sec::AbstractSection) = @sprintf("%12.4f", sec.A)
+section_str(sec::Beam_Section)    = @sprintf("%12.4e", sec.Iz)   # Iz can be very small, e.g. 2.1e-6
+
 section_title(io::IO, title) = println(io, "\n", title, "\n", "-"^length(title))
 
 # Plain-text report. u_pre: prescribed displacements (NaN = free), u: full solution,
-# R = K*u - F (support reactions are the entries at the prescribed DOFs).
-function write_report(io::IO, s::Structure, F, u_pre, u, R)
+# R = K*u - F (support reactions are the entries at the prescribed DOFs),
+# forces: internal forces of each element, from element_internal_forces.
+function write_report(io::IO, s::Structure, F, u_pre, u, R, forces)
     d = s.dofs_per_node
     prescribed = findall(!isnan, u_pre)
     free = findall(isnan, u_pre)
@@ -18,19 +25,20 @@ function write_report(io::IO, s::Structure, F, u_pre, u, R)
 
     section_title(io, "1. Model")
     println(io, "Structure type : ", s.kind)
-    println(io, "Nodes          : ", s.nnodes)
+    println(io, "Nodes          : ", nnodes(s))
     println(io, "Elements       : ", length(s.elements))
     println(io, "DOFs per node  : ", d)
     println(io, "DOFs total     : ", length(u), " (", length(free), " free, ",
             length(prescribed), " prescribed)")
 
     section_title(io, "2. Elements")
-    println(io, @sprintf("%4s %5s %5s %12s %12s %12s  %s", "elem", "i", "j", "L", "E", "A",
+    println(io, @sprintf("%4s %5s %5s %12s %12s %12s  %s", "elem", "i", "j", "L", "E",
+                         isempty(s.elements) ? "" : section_header(s.elements[1].section),
                          isempty(s.elements) ? "" : direction_header(s.elements[1].geometry)))
     for (k, e) in enumerate(s.elements)
         i, j = e.geometry.nodes
-        println(io, @sprintf("%4d %5d %5d %12.4f %12.4e %12.4f  %s", k, i, j,
-                             e.geometry.L, e.material.E, e.section.A,
+        println(io, @sprintf("%4d %5d %5d %12.4f %12.4e %s  %s", k, i, j,
+                             e.geometry.L, e.material.E, section_str(e.section),
                              direction_str(e.geometry)))
     end
 
@@ -56,6 +64,14 @@ function write_report(io::IO, s::Structure, F, u_pre, u, R)
     println(io, @sprintf("%-8s %16s", "DOF", "value"))
     for g in prescribed
         println(io, @sprintf("%-8s %16.4f", "R" * dof_name(s, g)[2:end], R[g]))
+    end
+
+    section_title(io, "7. Internal forces")
+    if !isempty(forces)
+        println(io, @sprintf("%4s", "elem"), join(@sprintf(" %14s", name) for name in keys(forces[1])))
+    end
+    for (k, f) in enumerate(forces)
+        println(io, @sprintf("%4d", k), join(@sprintf(" %14.4f", value) for value in f))
     end
 end
 

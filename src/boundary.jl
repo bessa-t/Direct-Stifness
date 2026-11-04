@@ -1,16 +1,9 @@
-function build_displacement_vector(s::Structure, boundary)
+# supports: pairs (node, values) from parse_nodal_rows
+function build_displacement_vector(s::Structure, supports)
     d = s.dofs_per_node
-    u_vec = fill(NaN, d * s.nnodes)
+    u_vec = fill(NaN, d * nnodes(s))
 
-    for row in boundary
-        node = Int(row[1])
-        values = row[2:end]
-
-        1 <= node <= s.nnodes ||
-            error("boundary: node $node does not exist (model has $(s.nnodes) nodes)")
-        length(values) == d ||
-            error("boundary: node $node has $(length(values)) values, expected $d")
-
+    for (node, values) in supports
         u_vec[node_dofs(node, d)] .= values
     end
 
