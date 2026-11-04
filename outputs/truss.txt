@@ -1,0 +1,60 @@
+DIRECT STIFFNESS METHOD - REPORT
+================================
+(values in the units of the input file)
+
+1. Model
+--------
+Structure type : 2d_truss
+Nodes          : 5
+Elements       : 7
+DOFs per node  : 2
+DOFs total     : 10 (6 free, 4 prescribed)
+
+2. Elements
+-----------
+elem     i     j            L            E            A  angle [deg]
+   1     1     2     200.0000   1.8000e+06      50.0000        0.000
+   2     2     3     200.0000   1.8000e+06      50.0000        0.000
+   3     1     4     200.0000   1.8000e+06      50.0000       60.000
+   4     4     2     200.0000   1.8000e+06      50.0000      -60.000
+   5     2     5     200.0000   1.8000e+06      50.0000       60.000
+   6     5     3     200.0000   1.8000e+06      50.0000      -60.000
+   7     4     5     200.0000   1.8000e+06      50.0000        0.000
+
+3. Applied loads
+----------------
+F4x          10000.0000
+
+4. Prescribed displacements
+---------------------------
+u1x            0.000000
+u1y            0.000000
+u3x            0.000000
+u3y            0.000000
+
+5. Nodal displacements
+----------------------
+DOF                 value
+u1x          0.000000e+00
+u1y          0.000000e+00
+u2x          5.555556e-03
+u2y         -6.415003e-03
+u3x          0.000000e+00
+u3y          0.000000e+00
+u4x          3.055556e-02
+u4y         -4.811252e-03
+u5x          1.944444e-02
+u5y         -1.603751e-03
+
+6. Support reactions
+--------------------
+DOF                 value
+R1x            -5000.0000
+R1y            -4330.1270
+R3x            -5000.0000
+R3y             4330.1270
+
+7. Global equilibrium check (sum of loads + reactions)
+------------------------------------------------------
+direction x    loads     10000.0000  reactions    -10000.0000  residual     1.82e-12
+direction y    loads         0.0000  reactions         0.0000  residual     0.00e+00

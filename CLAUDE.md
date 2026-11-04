@@ -5,7 +5,8 @@ Alvo atual: **treliça 2D**. A arquitetura já prevê treliça 3D e pórtico 2D/
 
 - Unidades dos exemplos: kgf e cm. Eixos globais: x para a direita, y para cima.
 - Julia 1.13. Código e identificadores em inglês; discussão com o autor em português.
-- Rodar: `julia src/test.jl` (funciona de qualquer pasta, usa `@__DIR__`).
+- Rodar: `julia src/Direct_Stiffness.jl [inputs/arquivo.toml]` (padrão: `inputs/truss.toml`); gera `outputs/<nome do input>.txt`.
+  `julia src/test.jl` imprime o mesmo relatório na tela. Funciona de qualquer pasta (usa `@__DIR__`).
 
 ## Estado atual
 
@@ -15,8 +16,9 @@ Alvo atual: **treliça 2D**. A arquitetura já prevê treliça 3D e pórtico 2D/
 | Montagem do modelo (`Structure`) | `src/assemble.jl` (`build_structure`) | pronto |
 | Matriz de rigidez global (esparsa) | `src/assemble.jl` | pronto |
 | Vetor de deslocamentos prescritos `u_pre` | `src/boundary.jl` | pronto |
-| Vetor de forças `F` | `src/types/external_forces.jl` | pronto para cargas nodais |
-| Solver | `src/solver.jl` | **rascunho que não compila**, a reescrever |
+| Vetor de forças `F` | `src/types/external_forces.jl` | pronto para cargas nodais (`nodal_loads`) |
+| Solver (partição) | `src/solver.jl` (`solve_system`) | pronto |
+| Relatório em texto | `src/report.jl` + `run_analysis` | pronto (sem esforços internos) |
 | Esforços internos | `src/internal_forces.jl` | vazio |
 | Pórtico (`Frame2D/3D`), rótulas, cargas de barra | — | não iniciado |
 
@@ -32,11 +34,12 @@ data ──build_structure──▶ Structure{Element{G,S}}
 Structure ──build_global_stiffness_matrix──▶ K (esparsa)
 mesh["boundary"] ──build_displacement_vector──▶ u_pre   (NaN = GDL livre)
 data["loads"]    ──build_F_vector──▶ F
-(K, F, u_pre) ──solver──▶ u, reações        [a fazer]
+(K, F, u_pre) ──solve_system──▶ u, R
+(s, F, u_pre, u, R) ──write_report──▶ outputs/<input>.txt
 (Structure, u) ──internal forces──▶ N por barra  [a fazer]
 ```
 
-`test.jl` percorre até a K global.
+`run_analysis(input)` em `Direct_Stiffness.jl` executa tudo e grava o relatório.
 
 ## Estrutura de arquivos
 
@@ -51,7 +54,8 @@ src/
 ├── elements/truss.jl            # Truss2D/Truss3D (aliases) e seus métodos
 ├── assemble.jl                  # Structure, build_structure, K global, node_dofs
 ├── boundary.jl                  # build_displacement_vector
-├── solver.jl
+├── solver.jl                    # solve_system (partição)
+├── report.jl                    # write_report (texto plano)
 └── internal_forces.jl
 ```
 
@@ -148,7 +152,7 @@ Termos nulos de `Ke` são armazenados (`dropzeros!` se necessário).
 - Cargas de barra (`constant_loads`) estão previstas, mas só fazem sentido com pórtico. Quando entrarem:
   tabela de funções por tipo (`LOAD_APPLIERS`), não hierarquia de tipos.
 
-### Solver (decisão recomendada, ainda não implementada)
+### Solver (implementado em `solver.jl`)
 **Partição** (eliminação dos GDL prescritos):
 
 ```julia
@@ -176,7 +180,9 @@ Por barra de treliça: `N = (E·A/L) · dot([-c, -s, c, s], u_e)`, positivo = tr
 - `G = E / (2(1+v))` deve ser derivado de `Material(E, v)`; não criar `Material3DFrame`.
 
 ## Pendências e problemas conhecidos
-1. `src/solver.jl` é rascunho inválido; reescrever com a partição acima (ou `solve_system` com máscara).
+1. `solve_system` detecta mecanismo pelo resíduo relativo `‖Kff·uf − rhs‖ ≤ 1e-8·‖rhs‖` (o Julia nem sempre lança
+   `SingularException`: no teste com só o nó 1 apoiado, o resíduo foi 0.45; na estrutura estável, 3e-16).
+   Se a carga for nula, a checagem não detecta mecanismo.
 2. `src/internal_forces.jl` vazio.
 3. Validar que a dimensão dos nós bate com `structure` (hoje `2d_truss` com nós 3D monta `Element{GeomData3D,...}` sem aviso).
 4. `Material.v` e `G(E,v)` sem uso por enquanto; `ElementStiffness` definido e não usado.

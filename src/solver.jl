@@ -1,16 +1,26 @@
-function solve_linear_system(K,U,F)
-    elimination = vec()
-    i=0
-    for u in U
-        i+=1
-        if u ==0
-            push!(elimination,i)
-        end
-    end
-    for i in elimination
-        F[i] = 0
-        for row in K
-            
+# Partition method: unknowns are the free DOFs (NaN in u_pre);
+# prescribed DOFs (supports and settlements) move to the right-hand side.
+function solve_system(K, F, u_pre)
+    free       = findall(isnan, u_pre)
+    prescribed = findall(!isnan, u_pre)
+
+    Kff = K[free, free]
+    rhs = F[free] - K[free, prescribed] * u_pre[prescribed]
+
+    uf = try
+        Kff \ rhs
+    catch err
+        err isa SingularException || rethrow()
+        error("solver: stiffness matrix is singular - check supports (unstable structure or mechanism)")
     end
 
+    # A mechanism may not raise SingularException (rounding gives garbage), so check the residual
+    norm(Kff * uf - rhs) <= 1e-8 * norm(rhs) ||
+        error("solver: system could not be solved accurately - check supports (unstable structure or mechanism)")
+
+    u = copy(u_pre)
+    u[free] = uf
+
+    R = K * u - F          # support reactions are R[prescribed]
+    return u, R
 end
