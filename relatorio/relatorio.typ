@@ -134,7 +134,7 @@ Cada ramo do fluxograma valida o que lê: existência dos nós citados, número 
 
 == Fluxo de Execução
 
-A análise completa é executada pela função `run_analysis`, definida em `Direct_Stiffness.jl`. Ela encadeia as cinco etapas do método, cada uma implementada em um arquivo próprio, e grava o relatório em `outputs/<nome do arquivo de entrada>.txt`. Os dados passam de uma etapa para a seguinte apenas por argumentos e valores de retorno, sem variáveis globais.
+A análise completa é executada pela função `run_analysis`, definida em `Direct_Stiffness.jl`. Ela encadeia as cinco etapas do método, cada uma implementada em um arquivo próprio, e grava o relatório em `outputs/<nome do arquivo de entrada>.txt`. 
 
 #figure(
   kind: image,
@@ -164,11 +164,11 @@ A análise completa é executada pela função `run_analysis`, definida em `Dire
 
 *5. Relatório.* Modelo, cargas, deslocamentos prescritos, deslocamentos nodais, reações e esforços internos são escritos em texto plano.
 
-O programa pode ser executado de duas formas. A primeira grava o relatório do pórtico em `outputs/2d_frame.txt`, e a segunda imprime na tela o relatório do exemplo fixo `inputs/2d_truss.toml`:
+O programa pode ser executado pelo seguinte comando, sendo o segundo argumento o endereço do arquivo de input a partir da raíz do diretório:
 
 ```bash
 julia src/Direct_Stiffness.jl inputs/2d_frame.toml
-julia src/test.jl
+
 ```
 
 
@@ -215,7 +215,7 @@ constant_loads = [[2, 0.0, -0.5]]       # elemento, qx, qy [kN/m]
 ```
 ]
 
-Nós e barras são numerados pela ordem das linhas. O tipo de estrutura (`structure`) escolhe, em tabelas de consulta, quantos graus de liberdade (GDL) cada nó tem e como a seção é lida. Acrescentar um tipo novo é acrescentar uma entrada em cada tabela. O arquivo `input.jl` converte o dicionário nas estruturas e vetores usados pelo restante do programa.
+Nós e barras são numerados pela ordem das linhas. O tipo de estrutura (`structure`) escolhe, em tabelas de consulta, quantos graus de liberdade (GDL) cada nó tem e como a seção é lida.  O arquivo `input.jl` converte o dicionário nas estruturas e vetores usados pelo restante do programa.
 
 == Estratégia de Montagem da Rigidez Global
 
@@ -245,13 +245,47 @@ end
 ```
 ]
 
-A função `sparse` soma os valores de posições repetidas, que é exatamente a soma da montagem. Assim evita-se alocar uma matriz densa $n times n$, cuja memória cresce com o quadrado do número de GDL.
+A função `sparse` soma os valores de posições repetidas, que é exatamente a soma da montagem. Assim, evita-se alocar uma matriz densa $n times n$, cuja memória cresce com o quadrado do número de GDL.
 
 == Tipos Concretos e Desempenho
 
 Todos os `struct` do programa têm campos com tipo concreto: `Float64` para propriedades e coordenadas, `Int` para números de nós, `Tuple{Int,Int}` para os nós de uma barra e `Vector{Vector{Float64}}` para as coordenadas da estrutura. O elemento (`Element{G,S}`) e a estrutura (`Structure{E}`) são paramétricos, de modo que o compilador conhece os tipos exatos de cada elemento, e o despacho de `element_stiffness` e `transformation_matrix` é resolvido na compilação. Assim o Julia gera código de máquina específico para cada tipo, sem verificações de tipo em tempo de execução.
 
-Essa escolha foi feita pensando em desempenho, mas nenhuma medição de tempo foi realizada, pois os exemplos são pequenos. Duas exceções conhecidas poderiam ser revistas em malhas grandes: `element_geometry` devolve `GeomData2D` ou `GeomData3D` conforme a dimensão dos nós (tipo de retorno não fixo), e a montagem acumula as triplas com `push!`, sem alocar os vetores com antecedência.
+Essa escolha foi feita pensando em desempenho, mas nenhuma medição de tempo foi realizada, pois os exemplos são pequenos. Duas exceções conhecidas poderiam ser revistas: `element_geometry` devolve `GeomData2D` ou `GeomData3D` conforme a dimensão dos nós (tipo de retorno não fixo), e a montagem acumula as triplas com `push!`, sem alocar os vetores com antecedência.
+
+== Estrutura do Elemento
+
+`Element{G,S}` guarda a geometria (`G`), o material e a seção (`S`) de uma barra. A geometria é `GeomData2D` ou `GeomData3D`, conforme a dimensão dos nós, e já traz pronto o que a rigidez e a transformação precisam (nós, cossenos diretores, comprimento):
+
+#codigo[
+```julia
+struct Element{G<:AbstractGeom, S<:AbstractSection}
+    geometry :: G
+    material :: Material
+    section  :: S
+end
+
+struct GeomData2D <: AbstractGeom
+    nodes::Tuple{Int,Int}
+    c::Float64   # cosseno diretor
+    s::Float64   # seno diretor
+    L::Float64   # comprimento
+end
+```
+]
+
+Cada tipo de elemento é só um alias de `Element` fixando `G` e `S`, o que dá despacho estático: o pórtico plano (`Frame_2D`) usa `GeomData2D` e `Frame_2D_Section` (A e $I_z$):
+
+#codigo[
+```julia
+const Frame_2D = Element{GeomData2D, Frame_2D_Section}
+
+function element_stiffness(e::Frame_2D)
+    E, A, L, I = e.material.E, e.section.A, e.geometry.L, e.section.Iz
+    ...
+end
+```
+]
 
 == Tratamento das Condições de Contorno e Carregamentos
 
@@ -526,6 +560,6 @@ Há também uma limitação de projeto. O elemento guarda apenas os índices de 
 
 = Conclusão
 
-Implementou-se, em Julia, um programa de análise pelo Método da Rigidez Direta para treliças, vigas e pórticos planos e treliças espaciais. Ele lê a estrutura de um arquivo TOML, monta a matriz global de forma esparsa, trata apoios, recalques e cargas distribuídas, e devolve deslocamentos, reações e esforços internos em um relatório de texto.
+Implementou-se, em Julia, um programa de análise pelo Método da Rigidez Direta para treliças, vigas, pórticos planos e treliças espaciais. Ele lê a estrutura de um arquivo TOML, monta a matriz global de forma esparsa, trata apoios, recalques e cargas distribuídas, e devolve deslocamentos, reações e esforços internos em um relatório de texto.
 
-Os resultados coincidem com os do Trabalho I nas treliças e na viga e com o Ftool no pórtico. A comparação também apontou um erro no Trabalho I, na matriz da barra 3 do pórtico. O programa substitui a montagem manual das matrizes, que era a etapa mais sujeita a erros no Trabalho I.
+Os resultados coincidem com os do Trabalho I nas treliças e na viga e com o Ftool no pórtico. A comparação também apontou um erro no Trabalho I, na matriz da barra 3 do pórtico. O programa, entre outras funcionalidades, substitui a montagem manual das matrizes, que era a etapa mais sujeita a erros no Trabalho I.
