@@ -1,5 +1,3 @@
-# Uniform load per unit length of bar, given by its global components (qx, qy), split into the
-# local components: qa along the bar (i -> j) and qt perpendicular to it (90° counterclockwise).
 function local_load(e::Element{GeomData2D}, qx, qy)
     c, s = e.geometry.c, e.geometry.s
     return (qa = c*qx + s*qy, qt = -s*qx + c*qy)
@@ -8,7 +6,6 @@ end
 # Nodal equivalents of the uniform load, in global axes.
 # Local vector (u, v, θ at i and j): [qa L/2, qt L/2, qt L²/12, qa L/2, qt L/2, -qt L²/12]
 function equivalent_nodal_loads(e::Beam, qx, qy)
-    # The beam stiffness is only defined for horizontal bars (local = global) and has no axial DOF
     L = e.geometry.L
     return [qy*L/2, qy*L^2/12, qy*L/2, -qy*L^2/12]
 end
@@ -17,11 +14,11 @@ function equivalent_nodal_loads(e::Frame_2D, qx, qy)
     L = e.geometry.L
     qa, qt = local_load(e, qx, qy)
     f_local = [qa*L/2, qt*L/2, qt*L^2/12, qa*L/2, qt*L/2, -qt*L^2/12]
-    return transformation_matrix(e)' * f_local               # rotate to global axes
+    return transformation_matrix(e)' * f_local          
 end
 
 # nodal_loads: pairs (node, values) from parse_nodal_rows
-# constant_loads: triples (element, qx, qy) from parse_constant_loads
+# constant_loads:  (element, qx, qy) from parse_constant_loads
 # Returns (f_vec, f_dist): loads applied at the nodes and nodal equivalents of the distributed loads.
 function build_F_vector(s::Structure, nodal_loads, constant_loads)
     d = s.dofs_per_node

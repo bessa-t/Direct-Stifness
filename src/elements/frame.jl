@@ -12,6 +12,7 @@ end
 
 function element_stiffness(e::Frame_2D)
     E,A,L,I = e.material.E, e.section.A, e.geometry.L, e.section.Iz
+    T = transformation_matrix(e)
     Ke = [
      E*A/L          0               0         -E*A/L          0               0
        0       12*E*I/L^3      6*E*I/L^2         0      -12*E*I/L^3      6*E*I/L^2
@@ -20,5 +21,5 @@ function element_stiffness(e::Frame_2D)
        0      -12*E*I/L^3     -6*E*I/L^2         0       12*E*I/L^3     -6*E*I/L^2
        0        6*E*I/L^2      2*E*I/L           0       -6*E*I/L^2      4*E*I/L
     ]
-    return transformation_matrix(e)'*Ke*transformation_matrix(e)
+    return  T'*Ke* T
 end

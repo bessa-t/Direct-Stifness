@@ -1,8 +1,4 @@
 # Internal forces of each bar. Every method returns a NamedTuple, so the report can print any structure.
-#
-# Bending from the integration of EI*v'''' = q (q positive along local y):
-#   EI*v''' = V(x) = q*x + c1
-#   EI*v''  = M(x) = q*x^2/2 + c1*x + c2
 V(x, q, c1)     = q * x + c1
 M(x, q, c1, c2) = q * x^2 / 2 + c1 * x + c2
 
@@ -21,9 +17,9 @@ function bending_forces(EI, L, q, v1, θ1, v2, θ2)
     return (Vi = V(0, q, c1), Vj = V(L, q, c1), Mi = M(0, q, c1, c2), Mj = M(L, q, c1, c2))
 end
 
-# Truss bar: axial force only, positive in tension. u_e = u[element_dofs(t, d)]
+
 function get_internal_forces(t::Union{Truss2D,Truss3D}, u_e, q = (qa = 0.0, qt = 0.0))
-    u_local = transformation_matrix(t) * u_e     # [u_i, u_j] along the bar axis
+    u_local = transformation_matrix(t) * u_e    
     return (N = t.material.E * t.section.A / t.geometry.L * (u_local[2] - u_local[1]),)
 end
 
@@ -34,7 +30,7 @@ function get_internal_forces(e::Beam, u_e, q = (qa = 0.0, qt = 0.0))
 end
 
 function get_internal_forces(e::Frame_2D, u_e, q = (qa = 0.0, qt = 0.0))
-    u_local = transformation_matrix(e) * u_e     # [u1, v1, θ1, u2, v2, θ2] in local axes
+    u_local = transformation_matrix(e) * u_e    
 
     E, A, L = e.material.E, e.section.A, e.geometry.L
     EI = E * e.section.Iz

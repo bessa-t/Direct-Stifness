@@ -31,7 +31,7 @@ elements = [
 ]
 
 # node, ux, uy, theta  (prescribed displacement in m / rad)
-#   0.0 = locked | nan = free | any other value = settlement
+#   0.0 = locked |NaN = free | any other value = settlement
 boundary = [
     [1, 0.0, 0.0, 0.0],   # node 1: clamped
     [4, 0.0, 0.0, 0.0],   # node 4: clamped
