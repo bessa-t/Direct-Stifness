@@ -7,14 +7,8 @@ function solve_system(K, F, u_pre)
     Kff = K[free, free]
     rhs = F[free] - K[free, prescribed] * u_pre[prescribed]
 
-    uf = try
-        Kff \ rhs
-    catch err
-        err isa SingularException || rethrow()
-        error("solver: stiffness matrix is singular - check supports (unstable structure or mechanism)")
-    end
+    uf =  Kff \ rhs
 
-    # A mechanism may not raise SingularException (rounding gives garbage), so check the residual
   
     u = copy(u_pre)
     u[free] = uf

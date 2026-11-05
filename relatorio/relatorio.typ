@@ -15,13 +15,13 @@
 
 = Introdução
 
-O Método da Rigidez Direta é a base dos programas de análise estrutural. A estrutura é dividida em elementos, cada um com a sua matriz de rigidez. Essas matrizes são somadas em uma matriz global $K$, e o comportamento da estrutura passa a ser descrito por $K U = F$. Resolvido o sistema, obtêm-se as reações de apoio e os esforços internos de cada barra.
+O Método da Rigidez Direta é a base dos programas de análise estrutural. A estrutura é dividida em elementos unidimensionais, cada um com a sua matriz de rigidez. Essas matrizes são somadas em uma matriz global $K$, e o comportamento da estrutura passa a ser descrito por $K U = F$. Resolvido o sistema, obtêm-se as reações de apoio e os esforços internos de cada barra.
 
-No Trabalho I, o método foi aplicado à mão. Este trabalho implementa um programa que lê a descrição de uma estrutura em um arquivo de entrada e devolve deslocamentos, reações e esforços internos.
+No Trabalho I, o método foi aplicado manualmente. Este trabalho implementa um programa que lê a descrição de uma estrutura em um arquivo de entrada e devolve deslocamentos, reações e esforços internos.
 
-O escopo são treliças (planas e espaciais), vigas de Euler-Bernoulli e pórticos planos, com material elástico linear e pequenos deslocamentos. Cargas distribuídas uniformes são aceitas em vigas (barras horizontais) e em barras de pórtico de qualquer orientação, informadas em eixos globais. Ficam como trabalhos futuros o pórtico espacial, as rótulas internas e as cargas trapezoidais.
+O escopo são treliças (planas e espaciais), vigas de Euler-Bernoulli e pórticos planos, com material elástico linear e pequenos deslocamentos. Cargas distribuídas uniformes são aceitas em vigas (barras horizontais) e em barras de pórtico de qualquer orientação, informadas em eixos globais. 
 
-== Linguagem e Ferramental
+== Linguagem
 
 O programa foi escrito em Julia, pelos seguintes motivos:
 
@@ -33,7 +33,7 @@ Usam-se apenas bibliotecas padrão: `LinearAlgebra`, `SparseArrays`, `TOML` (lei
 
 = Arquitetura do Software
 
-O programa é um único módulo Julia, `DirectStiffness`, dividido em arquivos pequenos, cada um responsável por uma etapa da análise. Os dados de entrada ficam em arquivos TOML, e os resultados são gravados em arquivos de texto.
+O programa é um único módulo Julia, `DirectStiffness`, dividido em arquivos pequenos, cada um responsável por uma etapa da análise. Os dados de entrada ficam em arquivos TOML, e os resultados são gravados em arquivos de texto. O código-fonte está disponível em #link("https://github.com/bessa-t/Direct-Stifness").
 
 == Organização do diretório
 
@@ -79,15 +79,15 @@ O programa é um único módulo Julia, `DirectStiffness`, dividido em arquivos p
 
 Os arquivos seguem três critérios:
 
-- *Tipos de dados* (`types/`): descrevem tipos abstratos de objetos (material, seção, geometria, elemento) e não contêm lógica de análise.
-- *Elementos* (`elements/`): um arquivo por tipo de elemento estrutural, com a sua matriz de rigidez e a sua matriz de transformação. Para acrescentar um novo elemento, é necessário apenas acrescentar um arquivo aqui, sem alterar a montagem ou o solver.
-- *Etapas da análise* (raiz de `src/`): um arquivo por etapa do processamento, na ordem em que acontecem (leitura, montagem, contorno, solução, esforços, relatório).
+- *Tipos de dados* (`types/`): definem os tipos usados no programa (material, seção, geometria, elemento) e não contêm lógica de análise.
+- *Elementos* (`elements/`): um arquivo por tipo de elemento estrutural, com a sua matriz de rigidez e a sua matriz de transformação, com exceção ao elemento de viga, que é dado como sempre horizontal.
+- *Etapas da análise* (raiz de `src/`): um arquivo por etapa do processamento, na ordem em que acontecem (leitura, com apoios e cargas; montagem; solução; esforços; relatório).
 
 Só o arquivo `Direct_Stiffness.jl` faz `include` dos demais. 
 
 == Fluxo da entrada de dados
 
-A leitura do arquivo TOML está concentrada em `input.jl`: é o único arquivo que conhece os nomes das chaves e o formato das linhas. Todo o restante do programa recebe dados já validados, na forma de estruturas e vetores. A função `load_model` devolve a estrutura `s`, o vetor de deslocamentos prescritos `u_pre`, o vetor de forças `F` e a carga distribuída de cada barra, `element_q`.
+A leitura do arquivo TOML está concentrada em `input.jl`: é o único arquivo que conhece os nomes das chaves e o formato das linhas. Todo o restante do programa recebe dados já validados, na forma de estruturas e vetores. A função `load_model` devolve a estrutura `s`, o vetor de deslocamentos prescritos `u_pre`, o vetor de forças `F`, as suas parcelas `f_vec` (cargas nodais) e `f_dist` (cargas distribuídas) e a carga distribuída de cada barra, `element_q`.
 
 #let caixa(corpo, fundo: rgb("#e8eef6")) = rect(
   fill: fundo,
@@ -125,10 +125,10 @@ A leitura do arquivo TOML está concentrada em `input.jl`: é o único arquivo q
       caixa(fundo: rgb("#dcebdc"))[`F` e `element_q` \ forças nodais totais],
     )
     seta
-    caixa[`load_model` devolve `(s, u_pre, F, element_q)`]
+    caixa[`load_model` devolve `(s, u_pre, F, f_vec, f_dist, element_q)`]
   }),
   caption: [Fluxograma da entrada de dados.],
-)
+) <fig-entrada>
 
 Cada ramo do fluxograma valida o que lê: existência dos nós citados, número de valores por nó compatível com os graus de liberdade, barras com dois nós existentes e existência de pelo menos um apoio. Erros de entrada interrompem a execução com uma mensagem indicando o que está errado.
 
@@ -141,7 +141,7 @@ A análise completa é executada pela função `run_analysis`, definida em `Dire
   supplement: [Figura],
   block(width: 70%, {
     set text(size: 9pt)
-    caixa[*1. Leitura* (`input.jl`) \ `load_model` \ devolve `s`, `u_pre`, `F`, `element_q`]
+    caixa[*1. Leitura* (`input.jl`) \ `load_model` \ devolve `s`, `u_pre`, `F`, `f_vec`, `f_dist`, `element_q`]
     seta
     caixa[*2. Montagem* (`assemble.jl`) \ `build_global_stiffness_matrix(s)` \ devolve `K` (esparsa)]
     seta
@@ -154,7 +154,7 @@ A análise completa é executada pela função `run_analysis`, definida em `Dire
   caption: [Fluxo de execução do programa.],
 )
 
-*1. Leitura.* O arquivo TOML é convertido em uma estrutura `Structure`, no vetor de deslocamentos prescritos `u_pre` e no vetor de forças `F` (Figura 2). Os apoios e as cargas só servem para montar esses vetores, e depois deixam de existir como objetos.
+*1. Leitura.* O arquivo TOML é convertido em uma estrutura `Structure`, no vetor de deslocamentos prescritos `u_pre` e no vetor de forças `F` (@fig-entrada). Os apoios e as cargas só servem para montar esses vetores, e depois deixam de existir como objetos.
 
 *2. Montagem.* Cada barra calcula a sua matriz de rigidez já em eixos globais, e esta é somada na posição dos seus graus de liberdade na matriz global esparsa `K`.
 
@@ -164,7 +164,7 @@ A análise completa é executada pela função `run_analysis`, definida em `Dire
 
 *5. Relatório.* Modelo, cargas, deslocamentos prescritos, deslocamentos nodais, reações e esforços internos são escritos em texto plano.
 
-O programa pode ser executado de duas formas. A primeira grava o relatório em `outputs/2d_frame.txt`, e a segunda imprime o relatório na tela:
+O programa pode ser executado de duas formas. A primeira grava o relatório do pórtico em `outputs/2d_frame.txt`, e a segunda imprime na tela o relatório do exemplo fixo `inputs/2d_truss.toml`:
 
 ```bash
 julia src/Direct_Stiffness.jl inputs/2d_frame.toml
@@ -172,9 +172,9 @@ julia src/test.jl
 ```
 
 
-= Decisões de Projeto e Particularidades de Implementação
+= Decisões de Projeto e Implementação
 
-Esta seção descreve as escolhas de estrutura de dados e as particularidades do programa que o diferenciam do cálculo manual.
+
 
 #let codigo(corpo) = block(
   fill: luma(247),
@@ -219,7 +219,7 @@ Nós e barras são numerados pela ordem das linhas. O tipo de estrutura (`struct
 
 == Estratégia de Montagem da Rigidez Global
 
-Os GDL são numerados por nó: o nó $n$ ocupa as posições $(n-1) d + 1$ a $n d$, em que $d$ é o número de GDL por nó (2 na treliça plana e na viga, 3 no pórtico plano). Cada elemento calcula a sua matriz de rigidez já em eixos globais, e a matriz global é montada de forma esparsa, por triplas (linha, coluna, valor):
+Os GDL são numerados por nó: o nó $n$ ocupa as posições $(n-1) d + 1$ a $n d$, em que $d$ é o número de GDL por nó (2 na treliça plana e na viga, 3 na treliça espacial e no pórtico plano). Cada elemento calcula a sua matriz de rigidez já em eixos globais, e a matriz global é montada de forma esparsa, por triplas (linha, coluna, valor):
 
 #codigo[
 ```julia
@@ -255,7 +255,7 @@ Essa escolha foi feita pensando em desempenho, mas nenhuma medição de tempo fo
 
 == Tratamento das Condições de Contorno e Carregamentos
 
-Apoios e cargas são lidos do TOML e viram dois vetores com um valor por GDL: `u_pre` (deslocamentos prescritos) e `F` (forças). A tabela resume o formato de cada dado:
+Apoios e cargas são lidos do TOML e viram dois vetores com um valor por GDL: `u_pre` (deslocamentos prescritos) e `F` (forças). A tabela resume o formato de cada dado no pórtico plano. Nos demais elementos, apoios e cargas nodais têm um valor para cada GDL do nó:
 
 #figure(
   table(
@@ -314,15 +314,15 @@ O resultado é somado em `F`. Como a reação é calculada por $R = K U - F$, as
 
 == Resolução do Sistema
 
-Reordenando os GDL em desconhecidos ($u$) e prescritos ($p$), o sistema fica:
+Reordenando os GDL em livres ($l$) e prescritos ($p$), o sistema fica:
 
-$ mat(K_(u u), K_(u p); K_(p u), K_(p p)) vec(U_u, U_p) = vec(F_u, R_p) $
+$ mat(K_(l l), K_(l p); K_(p l), K_(p p)) vec(U_l, U_p) = vec(F_l, F_p + R_p) $
 
-Como $U_p$ é conhecido, os deslocamentos desconhecidos saem de
+Como $U_p$ é conhecido, os deslocamentos livres saem de
 
-$ K_(u u) U_u = F_u - K_(u p) U_p $
+$ K_(l l) U_l = F_l - K_(l p) U_p $
 
-No código, `free` e `prescribed` guardam os índices obtidos por `findall`, `rhs` é o lado direito, e o operador `\` do Julia escolhe o método de solução. Se a matriz for singular (estrutura hipostática), o programa para com uma mensagem indicando que os apoios devem ser revistos.
+No código, `free` e `prescribed` guardam os índices obtidos por `findall`, `rhs` é o lado direito, e o operador `\` do Julia escolhe o método de solução. 
 
 #codigo[
 ```julia
@@ -333,12 +333,7 @@ function solve_system(K, F, u_pre)
     Kff = K[free, free]
     rhs = F[free] - K[free, prescribed] * u_pre[prescribed]
 
-    uf = try
-        Kff \ rhs
-    catch err
-        err isa SingularException || rethrow()
-        error("solver: stiffness matrix is singular - check supports")
-    end
+    uf = Kff \ rhs
 
     u = copy(u_pre)
     u[free] = uf
@@ -349,7 +344,7 @@ end
 ```
 ]
 
-Com todos os deslocamentos conhecidos, $R = K U - F$ vale zero nos GDL livres (equilíbrio) e dá a reação de apoio nos GDL prescritos, onde $F$ não incluía a incógnita.
+Com todos os deslocamentos conhecidos, $R = K U - F$ vale zero nos GDL livres (equilíbrio) e dá a reação de apoio nos GDL prescritos. Nesses GDL, $F$ contém apenas as cargas conhecidas ($F_p$), como as forças equivalentes de uma carga distribuída em barra ligada ao apoio, e a subtração deixa só a reação $R_p$.
 
 
 == Cálculo dos Esforços Internos
@@ -370,9 +365,11 @@ Depois de resolvido o sistema, os esforços de cada barra saem dos deslocamentos
 
 *Esforço normal.* É calculado como na treliça, $N = E A / L (u_j - u_i)$ com $u$ nos eixos locais, positivo em tração. Se houver carga ao longo da barra ($q_a$), $N$ varia linearmente e esse valor é o da média: $N_i = N + q_a L / 2$ e $N_j = N - q_a L / 2$.
 
-*Flexão.* Na viga e no pórtico, integra-se a equação da linha elástica, $E I v'''' = q_t$, com $q_t$ a carga uniforme perpendicular à barra:
+*Flexão.* Na viga e no pórtico, integra-se a equação da linha elástica, $E I v'''' = q_t$, com $q_t$ a carga uniforme perpendicular à barra. Adotando $V = E I v'''$ e $M = E I v''$:
 
 $ V(x) = q_t x + c_1, quad M(x) = (q_t x^2)/2 + c_1 x + c_2 $
+
+$ E I v'(x) = (q_t x^3)/6 + (c_1 x^2)/2 + c_2 x + c_3, quad E I v(x) = (q_t x^4)/24 + (c_1 x^3)/6 + (c_2 x^2)/2 + c_3 x + c_4 $
 
 As quatro constantes de integração ($c_1$ a $c_4$) são obtidas da equação abaixo, implementada na função `integration_constants`. Ela usa os deslocamentos locais das extremidades da barra, $v$ (transversal) e $theta$ (rotação):
 
@@ -411,6 +408,7 @@ Os resultados do programa foram comparados com os do Trabalho I e, no pórtico, 
   caption: legenda,
 )
 #show figure: set block(breakable: true)
+#show figure.where(kind: table): set block(breakable: false)
 
 == Treliça Bidimensional
 
@@ -435,7 +433,7 @@ Os deslocamentos e os esforços normais coincidem com o Trabalho I:
   caption: [Treliça plana: Trabalho I × programa.],
 )
 
-O equilíbrio global também fecha: $sum R_x = -5 - 5 = -10 "kN" = -P$ e $sum R_y = 0$. Em torno do nó 1, $R_(3y) dot 4 = 17.32 "kN" dot "m" = P sqrt(3)$.
+
 
 == Treliça Espacial
 
@@ -458,7 +456,7 @@ Entrada: `inputs/3d_truss.toml` (Exercício II).
   caption: [Treliça espacial: Trabalho I × programa.],
 )
 
-A única diferença está na barra 2 (−18.014 contra −18.028 kN) e vem do arredondamento do Trabalho I (rigidez $E A \/ L$ e $u$ arredondados). O equilíbrio do nó 1 na direção $y$ confirma o valor do programa: $N_2 dot m_2 = -P$, com $m_2 = 0.5547$, dá $N_2 = -10 \/ 0.5547 = -18.028$ kN.
+A única diferença está na barra 2 (−18.014 contra −18.028 kN) e vem do arredondamento do Trabalho I . 
 
 == Viga de Euler-Bernoulli
 
@@ -481,7 +479,7 @@ Entrada: `inputs/2d_beam.toml` (Exercício III, viga biengastada com $q$, $P$ e 
   caption: [Viga: Trabalho I × programa.],
 )
 
-O programa reproduz o resultado da rigidez direta do Trabalho I e fica a menos de 0.002 kN·m do resultado analítico em $M_d$.
+O programa reproduz o resultado da rigidez direta do Trabalho I. A diferença de 0.002 kN·m para o resultado analítico em $M_d$ vem de arredondamento no cálculo analítico.
 
 == Pórtico Bidimensional
 
@@ -492,15 +490,8 @@ Entrada: `inputs/2d_frame.toml` (Exercício IV).
 Na comparação com o Trabalho I houve divergência. Após uma análise mais criteriosa, concluiu-se que o erro estava no Trabalho I, que adotou $theta = 90°$ para a barra 3. Como a barra 3 vai do nó 3 (topo) ao nó 4 (base), o ângulo correto é $-90°$. Com a matriz do elemento 3 corrigida, os resultados do Trabalho I passam a coincidir com os do programa. Como verificação independente, a estrutura foi modelada no Ftool:
 
 #figure(
-  grid(
-    columns: (1fr, 1fr),
-    gutter: 8pt,
-    image("/assets/image.png", width: 85%),
-    image("/assets/image-1.png", width: 85%),
-    image("/assets/image-6.png", width: 85%),
-    image("/assets/image-3.png", width: 85%),
-  ),
-  caption: [Pórtico no Ftool: momento fletor e reações, $D_x$, $R_z$ e $D_y$.],
+  image("assets/image.png", width: 55%),
+  caption: [Pórtico no Ftool: momento fletor e reações.],
 )
 
 #figure(
@@ -510,10 +501,9 @@ Na comparação com o Trabalho I houve divergência. Após uma análise mais cri
     table.header[Grandeza][Programa][Ftool],
     [$R_(1x)$ (kN)], [0.083], [0.083],
     [$R_(1y)$ (kN)], [0.500], [0.500],
-    [$R_(1theta)$ (kN·m)], [0.056], [0.056],
+    [$R_(1theta)$ (kN·m)], [−0.056], [0.056],
     [$M$ no topo da coluna (kN·m)], [0.111], [0.111],
     [$M$ no meio do vão (kN·m)], [0.139], [0.139],
-    [$v_2$ (mm)], [−1.111 $times 10^(-3)$], [−1.111 $times 10^(-3)$],
   ),
   caption: [Pórtico: programa × Ftool. Os sinais seguem a convenção de cada programa, e o momento no meio do vão foi obtido de $V_i$ e $M_i$ do relatório.],
 )
@@ -521,14 +511,18 @@ Na comparação com o Trabalho I houve divergência. Após uma análise mais cri
 
 = Melhorias Futuras
 
+#block(breakable: false)[
 Para tornar o programa mais robusto, poderiam ser implementados:
 
 - testes automatizados;
 - visualização gráfica dos resultados;
 - elementos de pórtico tridimensional;
+- rótulas internas;
+- cargas trapezoidais;
 - elementos de casca (_shell_), para analisar estruturas mais gerais.
+]
 
-Há também uma limitação de projeto. O elemento guarda apenas os índices de dois nós, e os GDL são deduzidos do tipo de estrutura. Por isso o programa não analisa estruturas com mais de um tipo de elemento, como pórticos atirantados, nem elementos com mais de dois nós, como barras curvas. Para removê-las, o elemento deveria guardar a lista dos seus nós e dos respectivos GDL, e a montagem passaria a percorrer essa lista.
+Há também uma limitação de projeto. O elemento guarda apenas os índices de dois nós, e os GDL são deduzidos do tipo de estrutura. Por isso o programa não analisa estruturas com mais de um tipo de elemento, como pórticos atirantados, nem elementos com mais de dois nós, como barras curvas. Para incluir estas melhorias, o elemento deveria guardar a lista dos seus nós e dos respectivos GDL, e a montagem passaria a percorrer essa lista.
 
 = Conclusão
 
