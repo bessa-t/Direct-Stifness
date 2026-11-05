@@ -22,25 +22,27 @@ function bending_forces(EI, L, q, v1, θ1, v2, θ2)
 end
 
 # Truss bar: axial force only, positive in tension. u_e = u[element_dofs(t, d)]
-function get_internal_forces(t::Union{Truss2D,Truss3D}, u_e, q = 0.0)
+function get_internal_forces(t::Union{Truss2D,Truss3D}, u_e, q = (qa = 0.0, qt = 0.0))
     u_local = transformation_matrix(t) * u_e     # [u_i, u_j] along the bar axis
     return (N = t.material.E * t.section.A / t.geometry.L * (u_local[2] - u_local[1]),)
 end
 
-function get_internal_forces(e::Beam, u_e, q = 0.0)
+function get_internal_forces(e::Beam, u_e, q = (qa = 0.0, qt = 0.0))
     EI = e.material.E * e.section.Iz
     v1, θ1, v2, θ2 = u_e
-    return bending_forces(EI, e.geometry.L, q, v1, θ1, v2, θ2)
+    return bending_forces(EI, e.geometry.L, q.qt, v1, θ1, v2, θ2)
 end
 
-function get_internal_forces(e::Frame_2D, u_e, q = 0.0)
+function get_internal_forces(e::Frame_2D, u_e, q = (qa = 0.0, qt = 0.0))
     u_local = transformation_matrix(e) * u_e     # [u1, v1, θ1, u2, v2, θ2] in local axes
 
     E, A, L = e.material.E, e.section.A, e.geometry.L
     EI = E * e.section.Iz
-    N  = E * A / L * (u_local[4] - u_local[1])
+    N0 = E * A / L * (u_local[4] - u_local[1])      # mean axial force (tension positive)
 
-    return (N = N, bending_forces(EI, L, q, u_local[2], u_local[3], u_local[5], u_local[6])...)
+    # An axial load qa makes N vary linearly: N(x) = Ni - qa*x, with mean N0
+    return (Ni = N0 + q.qa * L / 2, Nj = N0 - q.qa * L / 2,
+            bending_forces(EI, L, q.qt, u_local[2], u_local[3], u_local[5], u_local[6])...)
 end
 
 # element_q: uniform load of each element, from load_model

@@ -16,7 +16,7 @@ Alvo atual: **treliça 2D**. A arquitetura já prevê treliça 3D e pórtico 2D/
 | Montagem do modelo (`Structure`) | `src/input.jl` (`build_structure`) | pronto |
 | Matriz de rigidez global (esparsa) | `src/assemble.jl` | pronto |
 | Vetor de deslocamentos prescritos `u_pre` | `src/boundary.jl` | pronto |
-| Vetor de forças `F` | `src/types/external_forces.jl` | pronto para `nodal_loads` e `constant_loads` (barras horizontais de viga/pórtico 2D) |
+| Vetor de forças `F` | `src/external_forces.jl` | pronto para `nodal_loads` e `constant_loads` (pórtico 2D em qualquer orientação; viga só horizontal) |
 | Viga de Bernoulli (`2d_beam`) | `src/elements/bernoulli_beam.jl` | pronto; `inputs/2d_beam.toml` conferido com solução independente (método das forças) |
 | Solver (partição) | `src/solver.jl` (`solve_system`) | pronto |
 | Relatório em texto | `src/report.jl` + `run_analysis` | pronto (sem esforços internos) |
@@ -52,11 +52,11 @@ src/
 │   ├── material_section.jl      # Material, AbstractSection, TrussSection, Beam_Section, Frame_2D_Section, Frame_3D
 │   ├── geometry.jl              # AbstractGeom, GeomData2D/3D, element_geometry
 │   ├── element.jl               # AbstractElement, Element{G,S}, element_dofs, ElementStiffness (não usado)
-│   └── external_forces.jl       # build_F_vector
 ├── elements/truss.jl            # Truss2D/Truss3D (aliases) e seus métodos
 ├── elements/bernoulli_beam.jl   # Beam (alias) e element_stiffness; só barras horizontais
 ├── elements/frame.jl            # Frame_2D (alias), transformation_matrix e element_stiffness
 ├── assemble.jl                  # Structure, K global, node_dofs
+├── external_forces.jl           # build_F_vector, equivalent_nodal_loads
 ├── input.jl                     # load_model, build_structure, parse_*: único arquivo que conhece o TOML
 ├── boundary.jl                  # build_displacement_vector
 ├── solver.jl                    # solve_system (partição)
@@ -85,7 +85,7 @@ boundary = [[nó, ux, uy], ...]            # 0.0 travado | nan livre | outro val
 
 [loads]                                   # NA RAIZ, não dentro de mesh
 nodal_loads = [[nó, Fx, Fy], ...]         # eixos globais
-constant_loads = [[elemento, q], ...]     # q uniforme no y local; só 2d_beam/2d_frame, barra horizontal
+constant_loads = [[elemento, qx, qy], ...]  # carga uniforme por comprimento de barra, em eixos GLOBAIS; 2d_beam (só horizontal, qx = 0) e 2d_frame (qualquer barra)
 ```
 
 Armadilha de TOML: tudo que vem depois de um cabeçalho `[tabela]` ou `[[tabela]]` pertence a ele.
@@ -159,9 +159,9 @@ Termos nulos de `Ke` são armazenados (`dropzeros!` se necessário).
 - Validações em `input.jl`: nó existente, número de valores igual a `d`, barra com 2 nós existentes, elemento de
   grupo existente; em `build_displacement_vector`: pelo menos um apoio. Chaves opcionais
   (`loads`, `nodal_loads`) usam `get(dict, chave, [])`; dados obrigatórios usam `dict[chave]`.
-- Cargas de barra (`constant_loads`): q uniforme vira forças nodais equivalentes `[qL/2, qL²/12, qL/2, -qL²/12]`.
+- Cargas de barra (`constant_loads`): a carga uniforme `(qx, qy)` (global, por comprimento de barra) é decomposta em `qa` (ao longo da barra) e `qt` (perpendicular, 90° anti-horário de i→j) por `local_load`, e vira forças nodais equivalentes.
   `build_F_vector` devolve `(f_vec, f_dist)`; `load_model` soma em `F`. Como `K*u = f_vec + f_dist + R`, a reação
-  é `R = K*u - F`, sem tratamento separado. Só vale em barra horizontal de `2d_beam`/`2d_frame` (`parse_constant_loads` valida).
+  é `R = K*u - F`, sem tratamento separado. `equivalent_nodal_loads(e, qx, qy)` tem um método por elemento: o pórtico monta o vetor local `[qa·L/2, qt·L/2, qt·L²/12, qa·L/2, qt·L/2, -qt·L²/12]` e gira com `transformation_matrix(e)'`; a viga é horizontal (local = global, usa só `qy`). `load_model` guarda `element_q[e] = (qa, qt)` para os esforços. Conferido: coluna com carga lateral fecha ΣRx, ΣRy e ΣM; coluna com peso próprio dá `Ni = -qL`, `Nj = 0`.
 
 ### Solver (implementado em `solver.jl`)
 **Partição** (eliminação dos GDL prescritos):
@@ -180,7 +180,7 @@ diferença é custo e estilo. `SingularException` indica estrutura hipostática 
 ### Esforços internos (`internal_forces.jl`)
 `get_internal_forces(e, u_e, q)` tem um método por elemento e devolve `NamedTuple`, com
 `u_e = u[element_dofs(e, d)]`, a mesma função usada na montagem. Treliça: `(; N)`, positivo = tração.
-Viga: `(; Vi, Vj, Mi, Mj)`. Pórtico 2D: `(; N, Vi, Vj, Mi, Mj)`, em eixos locais.
+Viga: `(; Vi, Vj, Mi, Mj)`. Pórtico 2D: `(; Ni, Nj, Vi, Vj, Mi, Mj)`, em eixos locais (`N` varia linearmente se houver carga axial `qa`: `Ni = N0 + qa·L/2`, `Nj = N0 - qa·L/2`).
 Flexão pela integração de `EI v'''' = q`: `V = qx + c1`, `M = qx²/2 + c1 x + c2`, com `c1..c4` obtidos dos
 deslocamentos das pontas em `integration_constants`.
 

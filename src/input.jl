@@ -23,10 +23,11 @@ function load_model(path::AbstractString)
     # The solver and the reactions (R = K*u - F) use the total load
     F = f_vec .+ f_dist
 
-    # Uniform load of each element, needed for the internal forces
-    element_q = zeros(length(s.elements))
-    for (e, q) in constant_loads
-        element_q[e] += q
+    # Uniform load of each element in local components (qa, qt), needed for the internal forces
+    element_q = [(qa = 0.0, qt = 0.0) for _ in s.elements]
+    for (e, qx, qy) in constant_loads
+        l = local_load(s.elements[e], qx, qy)
+        element_q[e] = (qa = element_q[e].qa + l.qa, qt = element_q[e].qt + l.qt)
     end
 
     return (; s, u_pre, F, f_vec, f_dist, element_q)
@@ -105,24 +106,24 @@ function parse_nodal_rows(rows, s::Structure, label)
     return parsed
 end
 
-# Rows [element, q] -> pairs (element, q). The equivalent loads assume uy and θ are the last two
-# DOFs of each node and that local y = global y, so only horizontal bars (i to the left of j) qualify.
+# Rows [element, qx, qy] -> triples (element, qx, qy): uniform load per unit length of bar, in global
+# axes. The frame accepts any bar; the beam only horizontal bars (checked by its stiffness) and qx = 0.
 function parse_constant_loads(rows, s::Structure)
-    parsed = Tuple{Int,Float64}[]
+    parsed = Tuple{Int,Float64,Float64}[]
 
     for row in rows
-        length(row) == 2 ||
-            error("constant_loads: row $row has $(length(row)) values, expected 2 (element, q)")
-        e, q = Int(row[1]), Float64(row[2])
+        length(row) == 3 ||
+            error("constant_loads: row $row has $(length(row)) values, expected 3 (element, qx, qy)")
+        e, qx, qy = Int(row[1]), Float64(row[2]), Float64(row[3])
 
         s.kind in ("2d_beam", "2d_frame") ||
             error("constant_loads: not supported for structure \"$(s.kind)\"")
         1 <= e <= length(s.elements) ||
             error("constant_loads: element $e does not exist (model has $(length(s.elements)) elements)")
-        s.elements[e].geometry.c ≈ 1 ||
-            error("constant_loads: element $e is not horizontal with node i on the left")
+        (s.kind == "2d_frame" || qx == 0) ||
+            error("constant_loads: element $e is a beam (no axial DOF), qx must be 0")
 
-        push!(parsed, (e, q))
+        push!(parsed, (e, qx, qy))
     end
 
     return parsed

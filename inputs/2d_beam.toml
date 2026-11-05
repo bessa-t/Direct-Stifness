@@ -42,7 +42,7 @@ boundary = [
 nodal_loads = [
     [3, -10.0, 2.0],   # P = 10 kN down and M = 2 kN.m at node 3
 ]
-# element, q in local y [kN/m]
+# element, qx, qy [kN/m]: uniform load per unit length of bar, in global axes (beam: qx = 0)
 constant_loads = [
-    [1, -0.5],   # q = 0.5 kN/m down on element 1
+    [1, 0.0, -0.5],   # q = 0.5 kN/m down on element 1
 ]

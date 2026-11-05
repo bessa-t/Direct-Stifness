@@ -1,0 +1,61 @@
+DIRECT STIFFNESS METHOD - REPORT
+================================
+(values in the units of the input file)
+
+1. Model
+--------
+Structure type : 2d_beam
+Nodes          : 4
+Elements       : 3
+DOFs per node  : 2
+DOFs total     : 8 (4 free, 4 prescribed)
+
+2. Elements
+-----------
+elem     i     j            L            E           Iz  angle [deg]
+   1     1     2       2.0000   1.8000e+08   2.1000e-06        0.000
+   2     2     3       2.0000   1.8000e+08   2.1000e-06        0.000
+   3     3     4       3.0000   1.8000e+08   2.1000e-06        0.000
+
+3. Applied loads
+----------------
+F1y             -0.5000
+F1θ             -0.1667
+F2y             -0.5000
+F2θ              0.1667
+F3y            -10.0000
+F3θ              2.0000
+
+4. Prescribed displacements
+---------------------------
+u1y            0.000000
+u1θ            0.000000
+u4y            0.000000
+u4θ            0.000000
+
+5. Nodal displacements
+----------------------
+DOF                 value
+u1y          0.000000e+00
+u1θ          0.000000e+00
+u2y         -2.784077e-02
+u2θ         -1.940035e-02
+u3y         -4.648526e-02
+u3θ          8.314437e-03
+u4y          0.000000e+00
+u4θ          0.000000e+00
+
+6. Support reactions
+--------------------
+DOF                 value
+R1y                5.2857
+R1θ                8.6190
+R4y                5.7143
+R4θ               -9.6190
+
+7. Internal forces
+------------------
+elem             Vi             Vj             Mi             Mj
+   1         5.2857         4.2857        -8.6190         0.9524
+   2         4.2857         4.2857         0.9524         9.5238
+   3        -5.7143        -5.7143         7.5238        -9.6190

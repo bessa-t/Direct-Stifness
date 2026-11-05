@@ -19,7 +19,7 @@ nodes = [
     [0.0, 0.0, 3.0],   # node 1 (top, loaded)
     [0.0, 0.0, 0.0],   # node 2 (base)
     [0.0, 2.0, 0.0],   # node 3
-    [2.0, 0.0, 0.0],   # node 4
+    [2.0, 2.0, 0.0],   # node 4
 ]
 
 # Element k is the k-th line. Node i, node j

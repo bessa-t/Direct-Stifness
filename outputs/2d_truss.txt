@@ -54,7 +54,13 @@ R1y            -4330.1270
 R3x            -5000.0000
 R3y             4330.1270
 
-7. Global equilibrium check (sum of loads + reactions)
-------------------------------------------------------
-direction x    loads     10000.0000  reactions    -10000.0000  residual     1.82e-12
-direction y    loads         0.0000  reactions         0.0000  residual     0.00e+00
+7. Internal forces
+------------------
+elem              N
+   1      2500.0000
+   2     -2500.0000
+   3      5000.0000
+   4     -5000.0000
+   5      5000.0000
+   6     -5000.0000
+   7     -5000.0000

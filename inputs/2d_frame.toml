@@ -38,8 +38,8 @@ boundary = [
 ]
 
 [loads]
-# element, q in local y [kN/m] (horizontal bars only)
-# Element 2 runs from node 2 to node 3 (local y = up), so a downward load is negative.
+# element, qx, qy [kN/m]: uniform load per unit length of bar, in global axes
+# (x to the right, y up). Element 2 is horizontal, so a downward load is qy < 0.
 constant_loads = [
-    [2, -0.5],   # q = 0.5 kN/m down on the beam
+    [2, 0.0, -0.5],   # q = 0.5 kN/m down on the beam
 ]
